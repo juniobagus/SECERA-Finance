@@ -1,17 +1,105 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Package, Briefcase, Edit, Trash2 } from "lucide-react";
 import clsx from "clsx";
 
 type ActiveTab = "products" | "assets";
 
+type Product = { id: string; name: string; sku: string; price: number; stock: number; };
+type Asset = { id: string; name: string; date: string; value: number; condition: string; };
+
+const emptyProduct: Product = { id: "", name: "", sku: "", price: 0, stock: 0 };
+const emptyAsset: Asset = { id: "", name: "", date: "", value: 0, condition: "Baik" };
+
 export default function InventoryPage() {
   const [activeTab, setActiveTab] = useState<ActiveTab>("products");
+  
+  const [products, setProducts] = useState<Product[]>([]);
+  const [assets, setAssets] = useState<Asset[]>([]);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [pForm, setPForm] = useState<Product>(emptyProduct);
+  const [aForm, setAForm] = useState<Asset>(emptyAsset);
+
+  const [deleteModal, setDeleteModal] = useState<{ type: string, id: string } | null>(null);
+
+  useEffect(() => {
+    const storedP = localStorage.getItem("secera_products");
+    const storedA = localStorage.getItem("secera_assets");
+    if (storedP) setProducts(JSON.parse(storedP));
+    if (storedA) setAssets(JSON.parse(storedA));
+  }, []);
+
+  const saveProducts = (data: Product[]) => {
+    setProducts(data);
+    localStorage.setItem("secera_products", JSON.stringify(data));
+  };
+
+  const saveAssets = (data: Asset[]) => {
+    setAssets(data);
+    localStorage.setItem("secera_assets", JSON.stringify(data));
+  };
+
+  const handleOpenModal = (item?: any) => {
+    if (activeTab === "products") {
+      setPForm(item ? item : emptyProduct);
+    } else {
+      setAForm(item ? item : { ...emptyAsset, date: new Date().toISOString().split('T')[0] });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (activeTab === "products") {
+      if (!pForm.name || !pForm.sku) return;
+      if (pForm.id) {
+        saveProducts(products.map(p => p.id === pForm.id ? pForm : p));
+      } else {
+        saveProducts([{ ...pForm, id: Date.now().toString() }, ...products]);
+      }
+    } else {
+      if (!aForm.name || !aForm.date) return;
+      if (aForm.id) {
+        saveAssets(assets.map(a => a.id === aForm.id ? aForm : a));
+      } else {
+        saveAssets([{ ...aForm, id: Date.now().toString() }, ...assets]);
+      }
+    }
+    setIsModalOpen(false);
+  };
+
+  const confirmDelete = (type: string, id: string) => {
+    setDeleteModal({ type, id });
+  };
+
+  const executeDelete = () => {
+    if (!deleteModal) return;
+    if (deleteModal.type === "products") {
+      saveProducts(products.filter(p => p.id !== deleteModal.id));
+    } else {
+      saveAssets(assets.filter(a => a.id !== deleteModal.id));
+    }
+    setDeleteModal(null);
+  };
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
+      {/* Custom Delete Modal */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Hapus Data</h3>
+            <p className="text-gray-500 text-sm mb-6">Apakah Anda yakin ingin menghapus data ini? Aksi ini tidak dapat dikembalikan.</p>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setDeleteModal(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors">Batal</button>
+              <button onClick={executeDelete} className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-red-600 hover:bg-red-700 transition-colors shadow-sm">Ya, Hapus</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900">Gudang & Aset</h1>
@@ -19,7 +107,7 @@ export default function InventoryPage() {
         </div>
         
         <button 
-          onClick={() => setIsModalOpen(true)}
+          onClick={() => handleOpenModal()}
           className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-5 py-2.5 rounded-xl text-sm font-medium transition-colors shadow-sm"
         >
           <Plus className="w-4 h-4" />
@@ -54,44 +142,47 @@ export default function InventoryPage() {
          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm animate-in slide-in-from-top-4">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-semibold text-gray-900">
-              Form {activeTab === "products" ? "Produk Baru" : "Aset Baru"}
+              {activeTab === "products" 
+                ? (pForm.id ? "Edit Produk" : "Produk Baru") 
+                : (aForm.id ? "Edit Aset" : "Aset Baru")
+              }
             </h2>
             <button onClick={() => setIsModalOpen(false)} className="text-sm text-gray-400 hover:text-gray-600 font-medium">Tutup</button>
           </div>
           
-          <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => { e.preventDefault(); setIsModalOpen(false); }}>
+          <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleSubmit}>
             {activeTab === "products" ? (
               <>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Nama Produk</label>
-                  <input type="text" placeholder="Kemeja Flanel Premium" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" />
+                  <input type="text" value={pForm.name} onChange={(e) => setPForm({...pForm, name: e.target.value})} placeholder="Contoh: Kemeja Flanel Premium" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">SKU / Kode Barang</label>
-                  <input type="text" placeholder="KMJ-FLN-01" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" />
+                  <input type="text" value={pForm.sku} onChange={(e) => setPForm({...pForm, sku: e.target.value})} placeholder="KMJ-FLN-01" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Harga Jual (Rp)</label>
-                  <input type="number" placeholder="150000" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" />
+                  <input type="number" value={pForm.price || ""} onChange={(e) => setPForm({...pForm, price: Number(e.target.value)})} placeholder="150000" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Stok Awal</label>
-                  <input type="number" placeholder="50" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" />
+                  <input type="number" value={pForm.stock || ""} onChange={(e) => setPForm({...pForm, stock: Number(e.target.value)})} placeholder="50" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" required />
                 </div>
               </>
             ) : (
               <>
                  <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Nama Aset</label>
-                  <input type="text" placeholder="Mesin Jahit Singer" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" />
+                  <input type="text" value={aForm.name} onChange={(e) => setAForm({...aForm, name: e.target.value})} placeholder="Mesin Jahit Singer" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Nilai Perolehan (Rp)</label>
-                  <input type="number" placeholder="5000000" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" />
+                  <input type="number" value={aForm.value || ""} onChange={(e) => setAForm({...aForm, value: Number(e.target.value)})} placeholder="5000000" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Kondisi</label>
-                  <select className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900">
+                  <select value={aForm.condition} onChange={(e) => setAForm({...aForm, condition: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900">
                     <option>Baik</option>
                     <option>Perlu Perbaikan</option>
                     <option>Rusak</option>
@@ -99,13 +190,14 @@ export default function InventoryPage() {
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-700">Tanggal Perolehan</label>
-                  <input type="date" className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" />
+                  <input type="date" value={aForm.date} onChange={(e) => setAForm({...aForm, date: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-gray-900" required />
                 </div>
               </>
             )}
             
-            <div className="md:col-span-2 flex justify-end mt-4">
-              <button type="submit" className="bg-gray-900 text-white px-8 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+            <div className="md:col-span-2 flex justify-end mt-4 gap-3">
+              <button type="button" onClick={() => setIsModalOpen(false)} className="px-6 py-2.5 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors">Batal</button>
+              <button type="submit" className="bg-gray-900 text-white px-8 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm">
                 Simpan {activeTab === "products" ? "Produk" : "Aset"}
               </button>
             </div>
@@ -127,13 +219,10 @@ export default function InventoryPage() {
                </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-               {[
-                 { name: "Kemeja Flanel Premium", sku: "KMJ-FLN-01", stock: 120, price: 185000 },
-                 { name: "Celana Denim Slimfit", sku: "CLN-DNM-02", stock: 85, price: 240000 },
-                 { name: "Kaos Polos Cotton Combed", sku: "KOS-PLS-03", stock: 300, price: 65000 },
-                 { name: "Jaket Bomber Canvas", sku: "JKT-BMR-04", stock: 45, price: 320000 },
-               ].map((item, i) => (
-                 <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+               {products.length === 0 ? (
+                 <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">Katalog produk masih kosong.</td></tr>
+               ) : products.map((item) => (
+                 <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                    <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
                        <Package className="w-5 h-5 text-gray-500" />
@@ -154,8 +243,8 @@ export default function InventoryPage() {
                    </td>
                    <td className="px-6 py-4">
                      <div className="flex justify-center gap-1">
-                       <button className="p-1.5 text-gray-400 hover:text-blue-600 rounded"><Edit className="w-4 h-4" /></button>
-                       <button className="p-1.5 text-gray-400 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button>
+                       <button onClick={() => handleOpenModal(item)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded"><Edit className="w-4 h-4" /></button>
+                       <button onClick={() => confirmDelete("products", item.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button>
                      </div>
                    </td>
                  </tr>
@@ -176,13 +265,10 @@ export default function InventoryPage() {
                </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-               {[
-                 { name: "Mesin Jahit Juki Obras", date: "12 Jan 2024", condition: "Baik", value: 4500000 },
-                 { name: "MacBook Air M2 (Admin)", date: "05 Mar 2025", condition: "Baik", value: 16500000 },
-                 { name: "Mesin Potong Kain Servo", date: "22 Nov 2023", condition: "Perlu Perawatan", value: 3200000 },
-                 { name: "Motor Operasional (Honda PCX)", date: "10 Feb 2022", condition: "Baik", value: 28000000 },
-               ].map((item, i) => (
-                 <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+               {assets.length === 0 ? (
+                 <tr><td colSpan={5} className="px-6 py-12 text-center text-gray-500">Belum ada daftar aset tercetak.</td></tr>
+               ) : assets.map((item) => (
+                 <tr key={item.id} className="hover:bg-gray-50/50 transition-colors">
                    <td className="px-6 py-4 font-medium text-gray-900 flex items-center gap-3">
                      <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
                        <Briefcase className="w-5 h-5 text-gray-500" />
@@ -203,8 +289,8 @@ export default function InventoryPage() {
                    </td>
                    <td className="px-6 py-4">
                      <div className="flex justify-center gap-1">
-                       <button className="p-1.5 text-gray-400 hover:text-blue-600 rounded"><Edit className="w-4 h-4" /></button>
-                       <button className="p-1.5 text-gray-400 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button>
+                       <button onClick={() => handleOpenModal(item)} className="p-1.5 text-gray-400 hover:text-blue-600 rounded"><Edit className="w-4 h-4" /></button>
+                       <button onClick={() => confirmDelete("assets", item.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded"><Trash2 className="w-4 h-4" /></button>
                      </div>
                    </td>
                  </tr>

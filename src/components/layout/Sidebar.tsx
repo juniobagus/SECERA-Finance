@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Wallet, ArrowRightLeft, Package, UserSquare2, Settings } from "lucide-react";
+import { LayoutDashboard, Wallet, ArrowUpRight, ArrowDownRight, Package, UserSquare2, Settings } from "lucide-react";
 import clsx from "clsx";
 
 const navItems = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
-  { name: "Income & Expense", href: "/transactions", icon: ArrowRightLeft },
+  { name: "Pemasukan (Income)", href: "/income", icon: ArrowUpRight },
+  { name: "Pengeluaran (Expense)", href: "/expense", icon: ArrowDownRight },
   { name: "Sales (Shopee/TikTok)", href: "/sales", icon: Wallet },
   { name: "Produk & Aset", href: "/inventory", icon: Package },
   { name: "Laporan Keuangan", href: "/reports", icon: UserSquare2 },
